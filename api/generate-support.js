@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import PptxGenJS from 'pptxgenjs';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 120 };
 
 const SUPABASE_URL = 'https://gjanblhahrauwkfdagbc.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
