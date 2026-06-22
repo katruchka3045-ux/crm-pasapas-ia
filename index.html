@@ -1469,6 +1469,10 @@ function renderSessions() {
       <td style="max-width:200px;font-size:12px;color:var(--gris-fonce)">${s.sujet||'—'}</td>
       <td>${badgeStatut(s.statut)}</td>
       <td>
+        ${s.support_pptx_url ? `
+          <button class="btn btn-sm btn-outline" onclick="window.open('${s.support_pptx_url}','_blank')" title="Voir le support PPTX">📊</button>
+          <button class="btn btn-sm btn-outline" onclick="window.open('${s.support_pitch_url}','_blank')" title="Voir le pitch oral" style="margin-left:4px">📝</button>
+        ` : ''}
         <button class="btn btn-sm btn-outline" onclick="editSession('${s.date}','${s.heure}','${s.id}')" title="Modifier">✏️</button>
         <button class="btn btn-sm btn-danger"  onclick="deleteSession('${s.date}','${s.heure}','${s.id}')" title="Supprimer" style="margin-left:4px">🗑</button>
       </td>
@@ -1724,12 +1728,18 @@ function saveSession() {
     return;
   }
 
+  const existingSession = editingKey
+    ? state.sessions.find(s => s.date===editingKey.date && s.heure===editingKey.heure && s.id===editingKey.id)
+    : null;
+
   const newSession = {
     id, nom, date, heure, duree,
     of: of_val, nature, statut,
     sujet, charge, notes,
     mois: getMois(date),
-    type: '', nb_app: 1
+    type: '', nb_app: 1,
+    support_pptx_url:  (editingKey && existingSession?.support_pptx_url)  || '',
+    support_pitch_url: (editingKey && existingSession?.support_pitch_url) || ''
   };
 
   // Enregistrer l'apprenant si nouveau
@@ -1753,6 +1763,49 @@ function saveSession() {
   closeModal();
   renderPlanning();
   renderStats();
+
+  // Déclenchement auto génération support si pertinent
+  const sessionKey = { date: newSession.date, heure: newSession.heure, id: newSession.id };
+  const needsGeneration = (charge === 'Creation' || charge === 'Adaptation')
+    && sujet
+    && !newSession.support_pptx_url;
+  if (needsGeneration) {
+    triggerSupportGeneration(sessionKey, newSession);
+  }
+}
+
+async function triggerSupportGeneration(sessionKey, session) {
+  showNotif('🪄 Génération du support en cours…', 'success');
+  try {
+    const response = await fetch('/api/generate-support', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sujet: session.sujet,
+        duree: session.duree,
+        of: session.of,
+        nature: session.nature,
+        chargeType: session.charge,
+        apiKey: state.apiKey
+      })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    const idx = state.sessions.findIndex(s =>
+      s.date === sessionKey.date && s.heure === sessionKey.heure && s.id === sessionKey.id);
+    if (idx !== -1) {
+      state.sessions[idx].support_pptx_url  = data.pptxUrl;
+      state.sessions[idx].support_pitch_url = data.pitchUrl;
+      saveState();
+      renderSessions();
+    }
+    showNotif('✅ Support de cours généré !');
+  } catch (e) {
+    showNotif('❌ Génération support : ' + (e.message || 'erreur'), 'error');
+  }
 }
 
 function deleteSession(date, heure, id) {
