@@ -1501,10 +1501,18 @@ function renderApprenants() {
     if (s.statut === 'Prevu') appStats[s.id].prevu++;
   });
 
-  const ids = Object.keys(APPRENANTS_FULL).filter(id => {
-    const a = APPRENANTS_FULL[id];
-    return !search || a.nom.toLowerCase().includes(search) || id.toLowerCase().includes(search);
-  }).sort((a,b) => APPRENANTS_FULL[a].nom.localeCompare(APPRENANTS_FULL[b].nom));
+  // Fusionner APPRENANTS_FULL + apprenants ajoutés manuellement via state.apprenants
+  const allIds = new Set([
+    ...Object.keys(APPRENANTS_FULL),
+    ...Object.keys(state.apprenants).filter(id => !['AMB','CON','DAI','BUS','ACC'].includes(id))
+  ]);
+
+  const getNom = id => APPRENANTS_FULL[id]?.nom || state.apprenants[id] || id;
+
+  const ids = [...allIds].filter(id => {
+    const nom = getNom(id).toLowerCase();
+    return !search || nom.includes(search) || id.toLowerCase().includes(search);
+  }).sort((a, b) => getNom(a).localeCompare(getNom(b)));
 
   if (ids.length === 0) {
     grid.innerHTML = `<div class="empty"><div class="empty-icon">👥</div><div>Aucun apprenant trouvé</div></div>`;
@@ -1514,7 +1522,14 @@ function renderApprenants() {
   const COLORS = ['1A237E','2E7D32','C2185B','E65100','4A148C','00695C','1565C0','4E342E'];
 
   grid.innerHTML = ids.map(id => {
-    const a        = APPRENANTS_FULL[id];
+    // Fallback pour les apprenants ajoutés manuellement (pas dans APPRENANTS_FULL)
+    const a = APPRENANTS_FULL[id] || {
+      nom: state.apprenants[id] || id,
+      of: '—', type: '—', date1: '—',
+      h_av26: 0, h_tot: 0,
+      h_mois: {Jan:0,Fév:0,Mar:0,Avr:0,Mai:0,Jun:0,Jul:0,Aoû:0,Sep:0,Oct:0,Nov:0,Déc:0},
+      notes: '', prevu: 0
+    };
     const st       = appStats[id] || { realise:0, prevu:0, h2026:0, ca:0 };
     const hAv      = a.h_av26 || 0;
     const hTot     = hAv + st.h2026;
