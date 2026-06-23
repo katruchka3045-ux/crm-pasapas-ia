@@ -1510,6 +1510,7 @@ function renderApprenants() {
   const getNom = id => APPRENANTS_FULL[id]?.nom || state.apprenants[id] || id;
 
   const ids = [...allIds].filter(id => {
+    if (state.apprenantDetails[id]?.hidden) return false; // masqué
     const nom = getNom(id).toLowerCase();
     return !search || nom.includes(search) || id.toLowerCase().includes(search);
   }).sort((a, b) => getNom(a).localeCompare(getNom(b)));
@@ -1561,7 +1562,8 @@ function renderApprenants() {
           <div class="app-name">${a.nom}</div>
           <div class="app-id">${id} · ${a.of} · ${a.type}</div>
         </div>
-        ${a.prevu > 0 ? `<span class="badge badge-prevu" style="font-size:10px">⏳ ${st.prevu} à venir</span>` : ''}
+        ${st.prevu > 0 ? `<span class="badge badge-prevu" style="font-size:10px">⏳ ${st.prevu} à venir</span>` : ''}
+        <button onclick="event.stopPropagation();deleteApprenant('${id}')" title="Supprimer cette fiche" style="background:none;border:none;cursor:pointer;font-size:14px;color:#90A4AE;padding:0 2px;margin-left:4px">🗑️</button>
       </div>
 
       <!-- Heures -->
@@ -1621,6 +1623,18 @@ function editApprenantDate(id) {
   saveState();
   renderApprenants();
   showNotif(`✅ Date mise à jour pour ${a.nom}`);
+}
+
+function deleteApprenant(id) {
+  const nom = APPRENANTS_FULL[id]?.nom || state.apprenants[id] || id;
+  if (!confirm(`Supprimer la fiche de ${nom} ?\n(ses sessions ne seront pas supprimées)`)) return;
+  if (!state.apprenantDetails[id]) state.apprenantDetails[id] = {};
+  state.apprenantDetails[id].hidden = true;
+  // Si ajouté manuellement, supprimer aussi de state.apprenants
+  if (!APPRENANTS_FULL[id]) delete state.apprenants[id];
+  saveState();
+  renderApprenants();
+  showNotif(`🗑️ Fiche ${nom} supprimée`);
 }
 
 function editApprenantContrat(id) {
