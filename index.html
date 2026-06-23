@@ -1614,15 +1614,15 @@ function showAppDetail(id) {
 }
 
 function editApprenantDate(id) {
-  const a = APPRENANTS_FULL[id];
-  const current = state.apprenantDetails[id]?.date1 || a.date1 || '';
-  const val = prompt(`Modifier la date de 1ère session pour ${a.nom}\n(format actuel : ${current})`, current);
+  const nom = APPRENANTS_FULL[id]?.nom || state.apprenants[id] || id;
+  const current = state.apprenantDetails[id]?.date1 || APPRENANTS_FULL[id]?.date1 || '';
+  const val = prompt(`Modifier la date de 1ère session pour ${nom}\n(format actuel : ${current || '—'})`, current);
   if (val === null) return;
   if (!state.apprenantDetails[id]) state.apprenantDetails[id] = {};
   state.apprenantDetails[id].date1 = val.trim();
   saveState();
   renderApprenants();
-  showNotif(`✅ Date mise à jour pour ${a.nom}`);
+  showNotif(`✅ Date mise à jour pour ${nom}`);
 }
 
 function deleteApprenant(id) {
@@ -1638,9 +1638,9 @@ function deleteApprenant(id) {
 }
 
 function editApprenantContrat(id) {
-  const a = APPRENANTS_FULL[id];
+  const nom = APPRENANTS_FULL[id]?.nom || state.apprenants[id] || id;
   const current = state.apprenantDetails[id]?.h_contrat ?? '';
-  const val = prompt(`Heures totales contractées pour ${a.nom}\n(ex: 4.5 pour 4h30)`, current);
+  const val = prompt(`Heures totales contractées pour ${nom}\n(ex: 4.5 pour 4h30)`, current);
   if (val === null) return;
   const nb = parseFloat(val);
   if (isNaN(nb) || nb < 0) { showNotif('❌ Valeur invalide', 'error'); return; }
@@ -1648,7 +1648,7 @@ function editApprenantContrat(id) {
   state.apprenantDetails[id].h_contrat = nb;
   saveState();
   renderApprenants();
-  showNotif(`✅ Heures contrat mises à jour pour ${a.nom}`);
+  showNotif(`✅ Heures contrat mises à jour pour ${nom}`);
 }
 
 // ════════════════════════════════════════
