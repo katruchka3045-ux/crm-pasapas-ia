@@ -1518,8 +1518,8 @@ function renderApprenants() {
     const st       = appStats[id] || { realise:0, prevu:0, h2026:0, ca:0 };
     const hAv      = a.h_av26 || 0;
     const hTot     = hAv + st.h2026;
-    const hContrat = a.h_tot || 0;
-    const hRestant = Math.max(0, hContrat - hTot);
+    const hContrat = state.apprenantDetails[id]?.h_contrat ?? null; // null = non renseigné
+    const hRestant = hContrat !== null ? Math.max(0, hContrat - hTot) : null;
     const date1    = state.apprenantDetails[id]?.date1 || a.date1 || '—';
     const init     = a.nom.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
     const col      = COLORS[a.nom.charCodeAt(0) % COLORS.length];
@@ -1568,13 +1568,15 @@ function renderApprenants() {
       ${st.h2026 > 0 ? `<div style="display:flex;gap:2px;align-items:flex-end;margin-bottom:10px;padding:6px 4px;background:#FAFBFF;border-radius:6px">${sparkline}</div>` : ''}
 
       <!-- Heures contractées / restantes -->
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
         <span style="font-size:11px;background:#E8EAF6;color:#1A237E;padding:3px 8px;border-radius:10px;font-weight:600">
-          📋 Contrat : ${hContrat}h
+          📋 Contrat : ${hContrat !== null ? hContrat + 'h' : '—'}
+          <button onclick="event.stopPropagation();editApprenantContrat('${id}')" title="Modifier le nb d'heures contractées" style="background:none;border:none;cursor:pointer;font-size:11px;color:#1A237E;padding:0 2px;vertical-align:middle">✏️</button>
         </span>
+        ${hContrat !== null ? `
         <span style="font-size:11px;background:${hRestant > 0 ? '#E8F5E9' : '#FFEBEE'};color:${hRestant > 0 ? '#2E7D32' : '#C62828'};padding:3px 8px;border-radius:10px;font-weight:600">
           ${hRestant > 0 ? '⏳ ' + hRestant.toFixed(1) + 'h restantes' : '✅ Terminé'}
-        </span>
+        </span>` : ''}
       </div>
 
       <!-- Stats bas -->
@@ -1598,12 +1600,26 @@ function editApprenantDate(id) {
   const a = APPRENANTS_FULL[id];
   const current = state.apprenantDetails[id]?.date1 || a.date1 || '';
   const val = prompt(`Modifier la date de 1ère session pour ${a.nom}\n(format actuel : ${current})`, current);
-  if (val === null) return; // annulé
+  if (val === null) return;
   if (!state.apprenantDetails[id]) state.apprenantDetails[id] = {};
   state.apprenantDetails[id].date1 = val.trim();
   saveState();
   renderApprenants();
   showNotif(`✅ Date mise à jour pour ${a.nom}`);
+}
+
+function editApprenantContrat(id) {
+  const a = APPRENANTS_FULL[id];
+  const current = state.apprenantDetails[id]?.h_contrat ?? '';
+  const val = prompt(`Heures totales contractées pour ${a.nom}\n(ex: 4.5 pour 4h30)`, current);
+  if (val === null) return;
+  const nb = parseFloat(val);
+  if (isNaN(nb) || nb < 0) { showNotif('❌ Valeur invalide', 'error'); return; }
+  if (!state.apprenantDetails[id]) state.apprenantDetails[id] = {};
+  state.apprenantDetails[id].h_contrat = nb;
+  saveState();
+  renderApprenants();
+  showNotif(`✅ Heures contrat mises à jour pour ${a.nom}`);
 }
 
 // ════════════════════════════════════════
