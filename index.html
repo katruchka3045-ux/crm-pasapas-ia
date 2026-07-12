@@ -1043,13 +1043,37 @@ select:focus, input:focus { border-color: var(--bleu); box-shadow: 0 0 0 3px rgb
       <button class="modal-close" onclick="closeFactureModal()">✕</button>
     </div>
 
-    <!-- ÉTAPE 1 : Sélection du mois -->
+    <!-- ÉTAPE 1 : Sélection du type (Revolia) ou du mois (Studeria) -->
     <div id="factureStep1">
       <div class="modal-body">
-        <div class="form-group" style="margin-bottom:16px">
+
+        <!-- Toggle Collectif / Individuel — Revolia uniquement -->
+        <div id="revoliaTypeToggle" style="display:none;margin-bottom:16px">
+          <label class="form-label">Type de facturation *</label>
+          <div style="display:flex;gap:10px;margin-top:6px">
+            <button id="toggleCollectif" onclick="setRevoliaType('collectif')"
+              style="flex:1;padding:10px;border-radius:8px;border:2px solid #C2185B;background:#C2185B;color:white;font-weight:600;cursor:pointer;font-size:13px">
+              👥 Collectif<br><span style="font-size:11px;font-weight:400">Fin de mois → échéance le 5 du mois suivant</span>
+            </button>
+            <button id="toggleIndividuel" onclick="setRevoliaType('individuel')"
+              style="flex:1;padding:10px;border-radius:8px;border:2px solid #C2185B;background:white;color:#C2185B;font-weight:600;cursor:pointer;font-size:13px">
+              👤 Individuel<br><span style="font-size:11px;font-weight:400">Fin de parcours → échéance le 5 du M+2</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sélecteur mois (Studeria + Revolia Collectif) -->
+        <div id="factureMoisGroup" class="form-group" style="margin-bottom:16px">
           <label class="form-label">Sélectionner le mois *</label>
           <select class="form-input" id="factureMois" style="font-size:14px;padding:10px"></select>
         </div>
+
+        <!-- Sélecteur apprenant (Revolia Individuel) -->
+        <div id="factureAppGroup" class="form-group" style="display:none;margin-bottom:16px">
+          <label class="form-label">Apprenant à facturer *</label>
+          <select class="form-input" id="factureApp" style="font-size:14px;padding:10px"></select>
+        </div>
+
         <div id="facturePreview" style="background:var(--bleu-cl);border-radius:8px;padding:12px;font-size:12px;color:var(--bleu);min-height:60px"></div>
       </div>
       <div class="modal-footer">
@@ -2583,53 +2607,126 @@ function fromISODate(s) {
   return d + '/' + m + '/' + y;
 }
 
+let _revoliaType = 'collectif'; // 'collectif' ou 'individuel'
+
 function openFactureModal(ofName) {
-  _factureOf = ofName;
-  const header    = document.getElementById('factureModalHeader');
-  const title     = document.getElementById('factureModalTitle');
-  const contBtn   = document.getElementById('factureContinueBtn');
-  const genBtn    = document.getElementById('factureGenBtn');
-  const color     = ofName === 'Studeria' ? '#7C4DFF' : '#C2185B';
+  _factureOf   = ofName;
+  _revoliaType = 'collectif';
+  const header  = document.getElementById('factureModalHeader');
+  const title   = document.getElementById('factureModalTitle');
+  const contBtn = document.getElementById('factureContinueBtn');
+  const genBtn  = document.getElementById('factureGenBtn');
+  const color   = ofName === 'Studeria' ? '#7C4DFF' : '#C2185B';
   header.style.background  = color;
   title.textContent        = `🧾 Facture ${ofName}`;
   contBtn.style.background = color;
   genBtn.style.background  = color;
 
+  // Toggle Revolia
+  const toggle = document.getElementById('revoliaTypeToggle');
+  toggle.style.display = ofName === 'Revolia' ? '' : 'none';
+  if (ofName === 'Revolia') setRevoliaType('collectif');
+
   // Remplir le select des mois
   const sel = document.getElementById('factureMois');
   sel.innerHTML = MOIS_LISTE.map(m => {
     const ca = state.sessions
-      .filter(s => s.mois === m && s.statut === 'Realise' && s.of === ofName)
+      .filter(s => s.mois === m && s.statut === 'Realise' && s.of === ofName
+               && (ofName !== 'Revolia' || s.nature === 'Formation Collective'))
       .reduce((a, s) => a + caSession(s), 0);
     const flag = ca > 0 ? ` — ${ca.toLocaleString('fr-FR')} €` : ' (aucune session)';
     return `<option value="${m}">${m}${flag}</option>`;
   }).join('');
+  sel.value = MOIS_LISTE[new Date().getMonth()];
 
-  const moisActuel = MOIS_LISTE[new Date().getMonth()];
-  sel.value = moisActuel;
-
-  // Afficher étape 1, cacher étape 2
   document.getElementById('factureStep1').style.display = '';
   document.getElementById('factureStep2').style.display = 'none';
 
   updateFacturePreview();
   sel.onchange = updateFacturePreview;
+  document.getElementById('factureApp').onchange = updateFacturePreview;
   document.getElementById('factureModal').classList.add('open');
 }
 
+function setRevoliaType(type) {
+  _revoliaType = type;
+  const btnC = document.getElementById('toggleCollectif');
+  const btnI = document.getElementById('toggleIndividuel');
+  const color = '#C2185B';
+  btnC.style.background = type === 'collectif' ? color : 'white';
+  btnC.style.color      = type === 'collectif' ? 'white' : color;
+  btnI.style.background = type === 'individuel' ? color : 'white';
+  btnI.style.color      = type === 'individuel' ? 'white' : color;
+
+  document.getElementById('factureMoisGroup').style.display  = type === 'collectif' ? '' : 'none';
+  document.getElementById('factureAppGroup').style.display   = type === 'individuel' ? '' : 'none';
+
+  if (type === 'individuel') {
+    // Peupler la liste des apprenants Revolia individuel prêts à facturer
+    const sel = document.getElementById('factureApp');
+    const prets = Object.keys(APPRENANTS_FULL).filter(id => {
+      const a = APPRENANTS_FULL[id];
+      if (a.of !== 'Revolia' || a.type !== 'Individuel') return false;
+      const hC = state.apprenantDetails[id]?.h_contrat ?? null;
+      if (hC === null) return false;
+      const hFait = (a.h_av26 || 0) + (state.sessions.filter(s => s.id === id && s.statut === 'Realise').reduce((a,s) => a + s.duree, 0));
+      return hFait >= hC;
+    });
+    // Aussi les apprenants manuels Revolia
+    Object.keys(state.apprenants).forEach(id => {
+      if (APPRENANTS_FULL[id]) return;
+      const hC = state.apprenantDetails[id]?.h_contrat ?? null;
+      if (!hC) return;
+      const hFait = state.sessions.filter(s => s.id === id && s.statut === 'Realise').reduce((a,s) => a + s.duree, 0);
+      if (hFait >= hC) prets.push(id);
+    });
+
+    if (prets.length === 0) {
+      sel.innerHTML = '<option value="">— Aucun apprenant prêt à facturer —</option>';
+    } else {
+      sel.innerHTML = prets.map(id => {
+        const nom = APPRENANTS_FULL[id]?.nom || state.apprenants[id] || id;
+        const ca  = state.sessions.filter(s => s.id === id && s.statut === 'Realise').reduce((a,s) => a + caSession(s), 0);
+        return `<option value="${id}">${nom} — ${ca.toLocaleString('fr-FR')} €</option>`;
+      }).join('');
+    }
+  }
+  updateFacturePreview();
+}
+
 function updateFacturePreview() {
-  const moisStr  = document.getElementById('factureMois').value;
-  const sessions = state.sessions.filter(s =>
-    s.mois === moisStr && s.statut === 'Realise' && s.of === _factureOf
-  );
-  const nbInd   = sessions.filter(s => s.nature === 'Formation Individuelle').length;
-  const nbCol   = sessions.filter(s => s.nature === 'Formation Collective').length;
-  const nbAmb   = sessions.filter(s => s.nature === 'Ambassadrice').length;
-  const total   = sessions.reduce((a, s) => a + caSession(s), 0);
+  const color   = _factureOf === 'Studeria' ? '#7C4DFF' : '#C2185B';
   const factKey = 'factNum_' + _factureOf.toUpperCase();
   const nextNum = String((state.compta[factKey] || 1)).padStart(3, '0');
   const factId  = `${_factureOf.toUpperCase()}-2026-${nextNum}`;
-  const color   = _factureOf === 'Studeria' ? '#7C4DFF' : '#C2185B';
+
+  if (_factureOf === 'Revolia' && _revoliaType === 'individuel') {
+    const appId    = document.getElementById('factureApp').value;
+    const sessions = state.sessions.filter(s => s.id === appId && s.statut === 'Realise' && s.of === 'Revolia');
+    const total    = sessions.reduce((a, s) => a + caSession(s), 0);
+    const nom      = APPRENANTS_FULL[appId]?.nom || state.apprenants[appId] || appId || '—';
+    document.getElementById('facturePreview').innerHTML = !appId
+      ? `<span style="color:var(--gris-med)">⚠️ Sélectionnez un apprenant.</span>`
+      : sessions.length === 0
+        ? `<span style="color:var(--gris-med)">⚠️ Aucune session réalisée pour ${nom}.</span>`
+        : `<div style="display:flex;flex-direction:column;gap:5px">
+            <div><strong style="color:${color}">${factId}</strong> — Parcours individuel</div>
+            <div>👤 ${nom}</div>
+            <div>${sessions.length} séance(s) — ${sessions.reduce((a,s)=>a+s.duree,0)}h total</div>
+            <div style="font-size:14px;font-weight:700;color:${color};margin-top:4px">Total : ${total.toLocaleString('fr-FR',{minimumFractionDigits:2})} €</div>
+           </div>`;
+    return;
+  }
+
+  const moisStr = document.getElementById('factureMois').value;
+  const sessions = state.sessions.filter(s =>
+    s.mois === moisStr && s.statut === 'Realise' && s.of === _factureOf
+    && (_factureOf !== 'Revolia' || s.nature === 'Formation Collective')
+  );
+  const nbInd = sessions.filter(s => s.nature === 'Formation Individuelle').length;
+  const nbCol = sessions.filter(s => s.nature === 'Formation Collective').length;
+  const nbAmb = sessions.filter(s => s.nature === 'Ambassadrice').length;
+  const total = sessions.reduce((a, s) => a + caSession(s), 0);
 
   document.getElementById('facturePreview').innerHTML = sessions.length === 0
     ? `<span style="color:var(--gris-med)">⚠️ Aucune session réalisée pour ${_factureOf} en ${moisStr}.</span>`
@@ -2643,23 +2740,41 @@ function updateFacturePreview() {
 }
 
 function goToFactureStep2() {
-  const moisStr  = document.getElementById('factureMois').value;
-  const sessions = state.sessions.filter(s =>
-    s.mois === moisStr && s.statut === 'Realise' && s.of === _factureOf
-  );
-  if (sessions.length === 0) {
-    showNotif(`❌ Aucune session ${_factureOf} en ${moisStr}`, 'error');
-    return;
-  }
+  const year    = 2026;
+  const factKey = 'factNum_' + _factureOf.toUpperCase();
+  const nextNum = String((state.compta[factKey] || 1)).padStart(3, '0');
+  const factId  = `${_factureOf.toUpperCase()}-${year}-${nextNum}`;
+  const color   = _factureOf === 'Studeria' ? '#7C4DFF' : '#C2185B';
+  let sessions, lastDay, echeanceDay, summaryLabel;
 
-  const moisIdx     = MOIS_LISTE.indexOf(moisStr);
-  const year        = 2026;
-  const factKey     = 'factNum_' + _factureOf.toUpperCase();
-  const nextNum     = String((state.compta[factKey] || 1)).padStart(3, '0');
-  const factId      = `${_factureOf.toUpperCase()}-${year}-${nextNum}`;
-  const lastDay     = new Date(year, moisIdx + 1, 0);
-  const echeanceMois = _factureOf === 'Studeria' ? moisIdx + 2 : moisIdx + 5;
-  const echeanceDay = new Date(year, echeanceMois, 0);
+  if (_factureOf === 'Revolia' && _revoliaType === 'individuel') {
+    const appId = document.getElementById('factureApp').value;
+    sessions = state.sessions.filter(s => s.id === appId && s.statut === 'Realise' && s.of === 'Revolia');
+    if (sessions.length === 0) { showNotif('❌ Aucune session pour cet apprenant', 'error'); return; }
+    // Émission = aujourd'hui, échéance = 5 du M+2 (mois suivant le mois suivant)
+    const today = new Date();
+    lastDay     = today;
+    echeanceDay = new Date(today.getFullYear(), today.getMonth() + 2, 5);
+    const nom   = APPRENANTS_FULL[appId]?.nom || state.apprenants[appId] || appId;
+    summaryLabel = `${nom} — Parcours individuel`;
+  } else {
+    const moisStr = document.getElementById('factureMois').value;
+    const filtre  = _factureOf === 'Revolia'
+      ? (s => s.mois === moisStr && s.statut === 'Realise' && s.of === 'Revolia' && s.nature === 'Formation Collective')
+      : (s => s.mois === moisStr && s.statut === 'Realise' && s.of === _factureOf);
+    sessions = state.sessions.filter(filtre);
+    if (sessions.length === 0) { showNotif(`❌ Aucune session ${_factureOf} en ${moisStr}`, 'error'); return; }
+    const moisIdx = MOIS_LISTE.indexOf(moisStr);
+    lastDay = new Date(year, moisIdx + 1, 0);
+    // Studeria : échéance fin du mois suivant (inchangé)
+    // Revolia collectif : échéance 5 du mois suivant
+    if (_factureOf === 'Revolia') {
+      echeanceDay = new Date(year, moisIdx + 2, 5);
+    } else {
+      echeanceDay = new Date(year, moisIdx + 2, 0);
+    }
+    summaryLabel = `${moisStr} ${year}`;
+  }
 
   document.getElementById('factureNumero').value   = factId;
   document.getElementById('factureEmission').value = toISODate(lastDay);
@@ -2668,9 +2783,8 @@ function goToFactureStep2() {
   document.getElementById('factureBIC').value      = state.compta.bic  || 'CCBPFRPPMAR';
 
   const total = sessions.reduce((a, s) => a + caSession(s), 0);
-  const color = _factureOf === 'Studeria' ? '#7C4DFF' : '#C2185B';
   document.getElementById('factureStep2Summary').innerHTML =
-    `<strong style="color:${color}">${factId}</strong> — ${moisStr} 2026 — Total : <strong style="color:${color}">${total.toLocaleString('fr-FR', {minimumFractionDigits:2})} €</strong>`;
+    `<strong style="color:${color}">${factId}</strong> — ${summaryLabel} — Total : <strong style="color:${color}">${total.toLocaleString('fr-FR', {minimumFractionDigits:2})} €</strong>`;
 
   document.getElementById('factureStep1').style.display = 'none';
   document.getElementById('factureStep2').style.display = '';
@@ -2686,25 +2800,32 @@ function closeFactureModal() {
 }
 
 function lancerFacture() {
-  const moisStr  = document.getElementById('factureMois').value;
-  const sessions = state.sessions.filter(s =>
-    s.mois === moisStr && s.statut === 'Realise' && s.of === _factureOf
-  );
-  if (sessions.length === 0) {
-    showNotif(`❌ Aucune session ${_factureOf} en ${moisStr}`, 'error');
-    return;
-  }
-
   const factId       = document.getElementById('factureNumero').value.trim();
   const dateEmission = document.getElementById('factureEmission').value;
   const dateEcheance = document.getElementById('factureEcheance').value;
   const iban         = document.getElementById('factureIBAN').value.trim();
   const bic          = document.getElementById('factureBIC').value.trim();
 
-  // Sauvegarder IBAN/BIC dans le localStorage
   state.compta.iban = iban;
   state.compta.bic  = bic;
   saveState();
+
+  if (_factureOf === 'Revolia' && _revoliaType === 'individuel') {
+    const appId = document.getElementById('factureApp').value;
+    if (!appId) { showNotif('❌ Aucun apprenant sélectionné', 'error'); return; }
+    closeFactureModal();
+    generateFacturePDF(_factureOf, null, { factId, dateEmission, dateEcheance, iban, bic, revoliaIndividuelId: appId });
+    return;
+  }
+
+  const moisStr = document.getElementById('factureMois').value;
+  const filtre  = _factureOf === 'Revolia'
+    ? (s => s.mois === moisStr && s.statut === 'Realise' && s.of === 'Revolia' && s.nature === 'Formation Collective')
+    : (s => s.mois === moisStr && s.statut === 'Realise' && s.of === _factureOf);
+  if (!state.sessions.some(filtre)) {
+    showNotif(`❌ Aucune session ${_factureOf} en ${moisStr}`, 'error');
+    return;
+  }
 
   closeFactureModal();
   generateFacturePDF(_factureOf, moisStr, { factId, dateEmission, dateEcheance, iban, bic });
@@ -2720,12 +2841,24 @@ function generateFacturePDF(ofName, moisStr, overrides = {}) {
   const C_WHITE = [255, 255, 255];
   const C_GRAY  = [100, 100, 100];
 
-  const moisIdx = MOIS_LISTE.indexOf(moisStr);
-  const year    = 2026;
+  const year = 2026;
+  const revoliaInd = !!(overrides.revoliaIndividuelId);
 
-  const sessions = state.sessions.filter(s =>
-    s.mois === moisStr && s.statut === 'Realise' && s.of === ofName
-  );
+  // Sessions à facturer
+  let sessions;
+  let moisIdx;
+  if (revoliaInd) {
+    const appId = overrides.revoliaIndividuelId;
+    sessions = state.sessions.filter(s => s.id === appId && s.statut === 'Realise' && s.of === 'Revolia');
+    sessions.sort((a, b) => a.date.localeCompare(b.date));
+    moisIdx = 0; // non utilisé pour la période — calculé depuis sessions
+  } else {
+    moisIdx  = MOIS_LISTE.indexOf(moisStr);
+    const filtre = ofName === 'Revolia'
+      ? (s => s.mois === moisStr && s.statut === 'Realise' && s.of === 'Revolia' && s.nature === 'Formation Collective')
+      : (s => s.mois === moisStr && s.statut === 'Realise' && s.of === ofName);
+    sessions = state.sessions.filter(filtre);
+  }
 
   // ── N° FACTURE (depuis overrides ou compteur auto) ──
   const factKey = 'factNum_' + ofName.toUpperCase();
@@ -2734,12 +2867,23 @@ function generateFacturePDF(ofName, moisStr, overrides = {}) {
   const factId  = overrides.factId || `${ofName.toUpperCase()}-${year}-${factNum}`;
 
   // ── DATES (depuis overrides ou calcul auto) ──
-  const lastDay      = new Date(year, moisIdx + 1, 0);
-  const dateEmission = overrides.dateEmission ? fromISODate(overrides.dateEmission) : lastDay.toLocaleDateString('fr-FR');
-  const echeanceDate = ofName === 'Studeria' ? new Date(year, moisIdx + 2, 0) : new Date(year, moisIdx + 5, 0);
-  const dateEcheance = overrides.dateEcheance ? fromISODate(overrides.dateEcheance) : echeanceDate.toLocaleDateString('fr-FR');
-  const dateDebut    = `01/${String(moisIdx + 1).padStart(2, '0')}/${year}`;
-  const dateFin      = `${String(lastDay.getDate()).padStart(2, '0')}/${String(moisIdx + 1).padStart(2, '0')}/${year}`;
+  let dateEmission, dateEcheance, dateDebut, dateFin;
+  if (revoliaInd && sessions.length > 0) {
+    const d0 = sessions[0].date, dN = sessions[sessions.length - 1].date;
+    dateDebut    = fmtDate(d0);
+    dateFin      = fmtDate(dN);
+    const today  = new Date();
+    dateEmission = overrides.dateEmission ? fromISODate(overrides.dateEmission) : today.toLocaleDateString('fr-FR');
+    const ech    = new Date(today.getFullYear(), today.getMonth() + 2, 5);
+    dateEcheance = overrides.dateEcheance ? fromISODate(overrides.dateEcheance) : ech.toLocaleDateString('fr-FR');
+  } else {
+    const lastDay  = new Date(year, moisIdx + 1, 0);
+    dateEmission   = overrides.dateEmission ? fromISODate(overrides.dateEmission) : lastDay.toLocaleDateString('fr-FR');
+    const echDate  = ofName === 'Revolia' ? new Date(year, moisIdx + 2, 5) : new Date(year, moisIdx + 2, 0);
+    dateEcheance   = overrides.dateEcheance ? fromISODate(overrides.dateEcheance) : echDate.toLocaleDateString('fr-FR');
+    dateDebut      = `01/${String(moisIdx + 1).padStart(2, '0')}/${year}`;
+    dateFin        = `${String(lastDay.getDate()).padStart(2, '0')}/${String(moisIdx + 1).padStart(2, '0')}/${year}`;
+  }
 
   // ── COORDONNÉES BANCAIRES (depuis overrides ou défauts) ──
   const ibanPDF = overrides.iban || state.compta.iban || 'FR76 1460 7000 5470 9194 5927 301';
@@ -2858,74 +3002,129 @@ function generateFacturePDF(ofName, moisStr, overrides = {}) {
   // ─────────────────────────────────────────
   // TABLEAU FORMATIONS INDIVIDUELLES
   // ─────────────────────────────────────────
-  const sessionsInd = sessions.filter(s => s.nature === 'Formation Individuelle');
   let stInd = 0, stCol = 0, stAmb = 0;
 
-  if (sessionsInd.length > 0) {
-    // Regrouper par apprenant
-    const byApp = {};
-    sessionsInd.forEach(s => {
-      if (!byApp[s.id]) byApp[s.id] = { nom: nomApprenant(s.id), sessions: [] };
-      byApp[s.id].sessions.push(s);
-    });
-
-    const rows = Object.entries(byApp).map(([id, d]) => {
-      const dates   = d.sessions.map(s => fmtDate(s.date)).join(' · ');
-      const heures  = d.sessions.reduce((a, s) => a + s.duree, 0);
-      const taux    = tauxSession(d.sessions[0]);
-      const montant = heures * taux;
+  if (revoliaInd) {
+    // Revolia individuel : une ligne par séance avec date + heure
+    const nom  = APPRENANTS_FULL[overrides.revoliaIndividuelId]?.nom
+               || state.apprenants[overrides.revoliaIndividuelId]
+               || overrides.revoliaIndividuelId;
+    const taux = sessions.length > 0 ? tauxSession(sessions[0]) : TAUX.revolia;
+    const rows = sessions.map(s => {
+      const montant = s.duree * taux;
       stInd += montant;
-      return [d.nom, dates, heures + 'h', taux + ' EUR/h', fmtEuro(montant)];
+      return [fmtDate(s.date), s.heure || '—', s.duree + 'h', taux + ' EUR/h', fmtEuro(montant)];
     });
 
-    // Bandeau titre section
     doc.setFillColor(...C_VIO);
     doc.rect(14, y, 182, 7, 'F');
     doc.setTextColor(...C_WHITE);
     doc.setFontSize(9); doc.setFont('helvetica', 'bold');
-    doc.text('Formation IA — Accompagnement Individuel', 16, y + 5);
+    doc.text(`Formation IA — Parcours individuel — ${nom}`, 16, y + 5);
     y += 7;
 
     doc.autoTable({
       startY: y,
-      head: [['Apprenant', 'Date(s)', 'Heures', 'Taux', 'Montant']],
+      head: [['Date', 'Heure', 'Durée', 'Taux', 'Montant']],
       body: rows,
       theme: 'plain',
       styles: { fontSize: 8, cellPadding: 2.5, font: 'helvetica', textColor: [40, 40, 40] },
       headStyles: { fillColor: [237, 231, 255], textColor: [80, 0, 160], fontStyle: 'bold', fontSize: 7.5 },
       alternateRowStyles: { fillColor: [250, 248, 255] },
       columnStyles: {
-        0: { cellWidth: 46, fontStyle: 'bold' },
-        1: { cellWidth: 62 },
-        2: { cellWidth: 16, halign: 'center' },
-        3: { cellWidth: 24, halign: 'center' },
+        0: { cellWidth: 36 },
+        1: { cellWidth: 22, halign: 'center' },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 34, halign: 'center' },
         4: { cellWidth: 34, halign: 'right', fontStyle: 'bold' }
       },
       margin: { left: 14, right: 14 }
     });
     y = doc.lastAutoTable.finalY + 2;
 
-    // Sous-total ind.
     doc.setFillColor(237, 231, 255);
     doc.rect(120, y, 76, 6, 'F');
     doc.setTextColor(80, 0, 160);
     doc.setFontSize(8); doc.setFont('helvetica', 'bold');
-    doc.text('Sous-total formations individuelles :', 122, y + 4);
+    doc.text('Sous-total parcours individuel :', 122, y + 4);
     doc.text(fmtEuro(stInd), 194, y + 4, { align: 'right' });
     y += 10;
+  } else {
+    const sessionsInd = sessions.filter(s => s.nature === 'Formation Individuelle');
+
+    if (sessionsInd.length > 0) {
+      // Regrouper par apprenant, afficher date + heure de chaque séance
+      const byApp = {};
+      sessionsInd.forEach(s => {
+        if (!byApp[s.id]) byApp[s.id] = { nom: nomApprenant(s.id), sessions: [] };
+        byApp[s.id].sessions.push(s);
+      });
+
+      const rows = [];
+      Object.values(byApp).forEach(d => {
+        const taux = tauxSession(d.sessions[0]);
+        d.sessions.forEach((s, i) => {
+          const montant = s.duree * taux;
+          stInd += montant;
+          rows.push([
+            i === 0 ? d.nom : '',
+            fmtDate(s.date),
+            s.heure || '—',
+            s.duree + 'h',
+            taux + ' EUR/h',
+            fmtEuro(montant)
+          ]);
+        });
+      });
+
+      doc.setFillColor(...C_VIO);
+      doc.rect(14, y, 182, 7, 'F');
+      doc.setTextColor(...C_WHITE);
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+      doc.text('Formation IA — Accompagnement Individuel', 16, y + 5);
+      y += 7;
+
+      doc.autoTable({
+        startY: y,
+        head: [['Apprenant', 'Date', 'Heure', 'Durée', 'Taux', 'Montant']],
+        body: rows,
+        theme: 'plain',
+        styles: { fontSize: 8, cellPadding: 2.5, font: 'helvetica', textColor: [40, 40, 40] },
+        headStyles: { fillColor: [237, 231, 255], textColor: [80, 0, 160], fontStyle: 'bold', fontSize: 7.5 },
+        alternateRowStyles: { fillColor: [250, 248, 255] },
+        columnStyles: {
+          0: { cellWidth: 36, fontStyle: 'bold' },
+          1: { cellWidth: 28 },
+          2: { cellWidth: 18, halign: 'center' },
+          3: { cellWidth: 14, halign: 'center' },
+          4: { cellWidth: 28, halign: 'center' },
+          5: { cellWidth: 34, halign: 'right', fontStyle: 'bold' }
+        },
+        margin: { left: 14, right: 14 }
+      });
+      y = doc.lastAutoTable.finalY + 2;
+
+      doc.setFillColor(237, 231, 255);
+      doc.rect(120, y, 76, 6, 'F');
+      doc.setTextColor(80, 0, 160);
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+      doc.text('Sous-total formations individuelles :', 122, y + 4);
+      doc.text(fmtEuro(stInd), 194, y + 4, { align: 'right' });
+      y += 10;
+    }
   }
 
   // ─────────────────────────────────────────
   // TABLEAU SESSIONS COLLECTIVES
   // ─────────────────────────────────────────
-  const sessionsCol = sessions.filter(s => s.nature === 'Formation Collective');
+  const sessionsCol = revoliaInd ? [] : sessions.filter(s => s.nature === 'Formation Collective');
 
   if (sessionsCol.length > 0) {
     const rows = sessionsCol.map(s => {
       const taux    = tauxSession(s);
       const montant = s.duree * taux;
       stCol += montant;
-      return [s.id || 'Groupe', fmtDate(s.date), s.duree + 'h', taux + ' EUR/h', fmtEuro(montant)];
+      return [s.id || 'Groupe', fmtDate(s.date), s.heure || '—', s.duree + 'h', taux + ' EUR/h', fmtEuro(montant)];
     });
 
     doc.setFillColor(...C_TURQ);
@@ -2937,18 +3136,19 @@ function generateFacturePDF(ofName, moisStr, overrides = {}) {
 
     doc.autoTable({
       startY: y,
-      head: [['Groupe', 'Date', 'Heures', 'Taux', 'Montant']],
+      head: [['Groupe', 'Date', 'Heure', 'Durée', 'Taux', 'Montant']],
       body: rows,
       theme: 'plain',
       styles: { fontSize: 8, cellPadding: 2.5, font: 'helvetica', textColor: [40, 40, 40] },
       headStyles: { fillColor: [224, 247, 250], textColor: [0, 100, 140], fontStyle: 'bold', fontSize: 7.5 },
       alternateRowStyles: { fillColor: [240, 252, 255] },
       columnStyles: {
-        0: { cellWidth: 36 },
-        1: { cellWidth: 54 },
-        2: { cellWidth: 22, halign: 'center' },
-        3: { cellWidth: 36, halign: 'center' },
-        4: { cellWidth: 34, halign: 'right', fontStyle: 'bold' }
+        0: { cellWidth: 30 },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 18, halign: 'center' },
+        3: { cellWidth: 14, halign: 'center' },
+        4: { cellWidth: 30, halign: 'center' },
+        5: { cellWidth: 34, halign: 'right', fontStyle: 'bold' }
       },
       margin: { left: 14, right: 14 }
     });
@@ -2966,14 +3166,14 @@ function generateFacturePDF(ofName, moisStr, overrides = {}) {
   // ─────────────────────────────────────────
   // TABLEAU AMBASSADRICE
   // ─────────────────────────────────────────
-  const sessionsAmb = sessions.filter(s => s.nature === 'Ambassadrice');
+  const sessionsAmb = revoliaInd ? [] : sessions.filter(s => s.nature === 'Ambassadrice');
 
   if (sessionsAmb.length > 0) {
     const rows = sessionsAmb.map(s => {
       const taux    = tauxSession(s);
       const montant = s.duree * taux;
       stAmb += montant;
-      return [fmtDate(s.date), s.duree + 'h', taux + ' EUR/h', fmtEuro(montant)];
+      return [fmtDate(s.date), s.heure || '—', s.duree + 'h', taux + ' EUR/h', fmtEuro(montant)];
     });
 
     doc.setFillColor(...C_BLACK);
@@ -2985,17 +3185,18 @@ function generateFacturePDF(ofName, moisStr, overrides = {}) {
 
     doc.autoTable({
       startY: y,
-      head: [['Semaine / Date', 'Heures', 'Taux', 'Montant']],
+      head: [['Date', 'Heure', 'Durée', 'Taux', 'Montant']],
       body: rows,
       theme: 'plain',
       styles: { fontSize: 8, cellPadding: 2.5, font: 'helvetica', textColor: [40, 40, 40] },
       headStyles: { fillColor: [50, 50, 50], textColor: [200, 200, 200], fontStyle: 'bold', fontSize: 7.5 },
       alternateRowStyles: { fillColor: [248, 248, 248] },
       columnStyles: {
-        0: { cellWidth: 80 },
-        1: { cellWidth: 28, halign: 'center' },
-        2: { cellWidth: 40, halign: 'center' },
-        3: { cellWidth: 34, halign: 'right', fontStyle: 'bold' }
+        0: { cellWidth: 36 },
+        1: { cellWidth: 22, halign: 'center' },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 40, halign: 'center' },
+        4: { cellWidth: 34, halign: 'right', fontStyle: 'bold' }
       },
       margin: { left: 14, right: 14 }
     });
