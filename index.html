@@ -1624,10 +1624,15 @@ function renderApprenants() {
         </span>
         ${hContrat !== null ? (() => {
           const isRevoliaInd = a.of === 'Revolia' && a.type === 'Individuel';
+          const dejaFacture  = !!state.apprenantDetails[id]?.revoliaFacture;
           if (hRestant > 0) {
             return `<span style="font-size:11px;background:#E8F5E9;color:#2E7D32;padding:3px 8px;border-radius:10px;font-weight:600">⏳ ${hRestant.toFixed(1)}h restantes</span>`;
-          } else if (isRevoliaInd) {
-            return `<span style="font-size:11px;background:#FFF8E1;color:#E65100;padding:3px 8px;border-radius:10px;font-weight:700;border:1.5px solid #FFB300">🧾 Prêt à facturer — ${st.ca.toLocaleString('fr-FR')}€</span>`;
+          } else if (isRevoliaInd && !dejaFacture) {
+            return `<span style="font-size:11px;background:#FFF8E1;color:#E65100;padding:3px 8px;border-radius:10px;font-weight:700;border:1.5px solid #FFB300">🧾 Prêt à facturer — ${st.ca.toLocaleString('fr-FR')}€</span>
+                    <button onclick="event.stopPropagation();marquerFacture('${id}')" title="Marquer comme déjà facturé" style="margin-left:6px;background:#E65100;color:white;border:none;border-radius:8px;padding:2px 8px;font-size:10px;cursor:pointer;font-weight:600">✓ Marquer facturé</button>`;
+          } else if (isRevoliaInd && dejaFacture) {
+            return `<span style="font-size:11px;background:#E8F5E9;color:#2E7D32;padding:3px 8px;border-radius:10px;font-weight:600">✅ Facturé</span>
+                    <button onclick="event.stopPropagation();marquerFacture('${id}', true)" title="Remettre en Prêt à facturer" style="margin-left:6px;background:none;border:1px solid #ccc;border-radius:8px;padding:2px 8px;font-size:10px;cursor:pointer;color:#888">↩ Annuler</button>`;
           } else {
             return `<span style="font-size:11px;background:#FFEBEE;color:#C62828;padding:3px 8px;border-radius:10px;font-weight:600">✅ Terminé</span>`;
           }
@@ -1651,6 +1656,7 @@ function renderApprenants() {
   const aFacturer = ids.filter(id => {
     const a2 = APPRENANTS_FULL[id] || { of: '—', type: '—' };
     if (a2.of !== 'Revolia' || a2.type !== 'Individuel') return false;
+    if (state.apprenantDetails[id]?.revoliaFacture) return false;
     const hC = state.apprenantDetails[id]?.h_contrat ?? null;
     if (hC === null) return false;
     const hAv2 = a2.h_av26 || 0;
@@ -1693,6 +1699,15 @@ function editApprenantDate(id) {
   saveState();
   renderApprenants();
   showNotif(`✅ Date mise à jour pour ${nom}`);
+}
+
+function marquerFacture(id, annuler = false) {
+  if (!state.apprenantDetails[id]) state.apprenantDetails[id] = {};
+  state.apprenantDetails[id].revoliaFacture = !annuler;
+  saveState();
+  renderApprenants();
+  const nom = APPRENANTS_FULL[id]?.nom || state.apprenants[id] || id;
+  showNotif(annuler ? `↩ ${nom} remis en "Prêt à facturer"` : `✅ ${nom} marqué comme facturé`);
 }
 
 function deleteApprenant(id) {
