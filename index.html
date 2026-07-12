@@ -1178,7 +1178,8 @@ const TAUX = {
   studeria_ind_avant: 50,
   studeria_ind_depuis: 55,
   studeria_collectif: 75,
-  ambassadrice: 60,
+  ambassadrice_avant: 60,   // avant juin 2026
+  ambassadrice_depuis: 50,  // depuis juin 2026
   revolia: 60,
   revolia_collectif: 80,
   charges: 0.22
@@ -1269,7 +1270,11 @@ function badgeNature(n) {
   return `<span class="badge badge-${cls}">${lbl} ${n}</span>`;
 }
 function tauxSession(s) {
-  if (s.nature === 'Ambassadrice') return TAUX.ambassadrice;
+  if (s.nature === 'Ambassadrice') {
+    const m = parseInt(s.date.split('-')[1]);
+    const y = parseInt(s.date.split('-')[0]);
+    return (y > 2026 || (y === 2026 && m >= 6)) ? TAUX.ambassadrice_depuis : TAUX.ambassadrice_avant;
+  }
   if (s.nature === 'Formation Collective') {
     if (s.of === 'Revolia') return TAUX.revolia_collectif; // 80€ forfait/session
     return TAUX.studeria_collectif;
