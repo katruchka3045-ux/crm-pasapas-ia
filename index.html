@@ -705,6 +705,9 @@ select:focus, input:focus { border-color: var(--bleu); box-shadow: 0 0 0 3px rgb
     <div class="bpf-detail" id="bpfDetail"></div>
   </div>
 
+  <!-- BANDEAU REVOLIA À FACTURER -->
+  <div id="revoliaFacturerBanner" style="display:none;margin-bottom:16px"></div>
+
   <!-- LISTE APPRENANTS -->
   <div class="card" style="margin-bottom:16px">
     <div class="card-header">
@@ -1595,10 +1598,16 @@ function renderApprenants() {
           📋 Contrat : ${hContrat !== null ? hContrat + 'h' : '—'}
           <button onclick="event.stopPropagation();editApprenantContrat('${id}')" title="Modifier le nb d'heures contractées" style="background:none;border:none;cursor:pointer;font-size:11px;color:#1A237E;padding:0 2px;vertical-align:middle">✏️</button>
         </span>
-        ${hContrat !== null ? `
-        <span style="font-size:11px;background:${hRestant > 0 ? '#E8F5E9' : '#FFEBEE'};color:${hRestant > 0 ? '#2E7D32' : '#C62828'};padding:3px 8px;border-radius:10px;font-weight:600">
-          ${hRestant > 0 ? '⏳ ' + hRestant.toFixed(1) + 'h restantes' : '✅ Terminé'}
-        </span>` : ''}
+        ${hContrat !== null ? (() => {
+          const isRevoliaInd = a.of === 'Revolia' && a.type === 'Individuel';
+          if (hRestant > 0) {
+            return `<span style="font-size:11px;background:#E8F5E9;color:#2E7D32;padding:3px 8px;border-radius:10px;font-weight:600">⏳ ${hRestant.toFixed(1)}h restantes</span>`;
+          } else if (isRevoliaInd) {
+            return `<span style="font-size:11px;background:#FFF8E1;color:#E65100;padding:3px 8px;border-radius:10px;font-weight:700;border:1.5px solid #FFB300">🧾 Prêt à facturer — ${st.ca.toLocaleString('fr-FR')}€</span>`;
+          } else {
+            return `<span style="font-size:11px;background:#FFEBEE;color:#C62828;padding:3px 8px;border-radius:10px;font-weight:600">✅ Terminé</span>`;
+          }
+        })() : ''}
       </div>
 
       <!-- Stats bas -->
@@ -1612,6 +1621,38 @@ function renderApprenants() {
       </div>
     </div>`;
   }).join('');
+
+  // Bandeau Revolia "à facturer"
+  const banner = document.getElementById('revoliaFacturerBanner');
+  const aFacturer = ids.filter(id => {
+    const a2 = APPRENANTS_FULL[id] || { of: '—', type: '—' };
+    if (a2.of !== 'Revolia' || a2.type !== 'Individuel') return false;
+    const hC = state.apprenantDetails[id]?.h_contrat ?? null;
+    if (hC === null) return false;
+    const hAv2 = a2.h_av26 || 0;
+    const st2 = appStats[id] || { h2026: 0 };
+    return (hAv2 + st2.h2026) >= hC;
+  });
+  if (aFacturer.length > 0) {
+    const lignes = aFacturer.map(id => {
+      const nom = APPRENANTS_FULL[id]?.nom || state.apprenants[id] || id;
+      const ca = (appStats[id]?.ca || 0).toLocaleString('fr-FR');
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.15)">
+        <span style="font-weight:600">${nom} <span style="font-size:11px;opacity:.8">(${id})</span></span>
+        <span style="font-weight:700;font-size:15px">${ca}€</span>
+      </div>`;
+    }).join('');
+    banner.style.display = 'block';
+    banner.innerHTML = `<div style="background:linear-gradient(135deg,#E65100,#F57C00);color:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 16px rgba(230,81,0,.25)">
+      <div style="padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.2)">
+        <span style="font-size:18px">🧾</span>
+        <strong style="font-size:14px">Revolia — ${aFacturer.length} apprenant(s) à facturer</strong>
+      </div>
+      ${lignes}
+    </div>`;
+  } else {
+    banner.style.display = 'none';
+  }
 }
 
 function showAppDetail(id) {
