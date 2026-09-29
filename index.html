@@ -602,6 +602,7 @@ select:focus, input:focus { border-color: var(--bleu); box-shadow: 0 0 0 3px rgb
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <div class="header-date" id="headerDate"></div>
+    <select id="anneeSelect" onchange="setAnnee(this.value)" title="Année affichée (compta, facturation, récap, BPF)" style="font-size:12px;padding:4px 6px;border-radius:6px"><option>2026</option><option>2027</option><option>2028</option></select>
     <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3);font-size:12px" onclick="exportData()" title="Exporter toutes les données en JSON">💾 Exporter</button>
     <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3);font-size:12px" onclick="document.getElementById('importInput').click()" title="Importer un fichier JSON exporté">📂 Importer</button>
     <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
@@ -737,6 +738,7 @@ select:focus, input:focus { border-color: var(--bleu); box-shadow: 0 0 0 3px rgb
               <th>Mois</th><th>Facturé</th>
               <th style="color:#A5D6A7">Studeria reçu</th>
               <th style="color:#A5D6A7">Revolia reçu</th>
+              <th style="color:#A5D6A7">Excellis reçu</th>
               <th>Encaissé</th><th>Reste</th>
             </tr>
           </thead>
@@ -745,7 +747,7 @@ select:focus, input:focus { border-color: var(--bleu); box-shadow: 0 0 0 3px rgb
             <tr class="total-row">
               <td>TOTAL 2026</td>
               <td id="tot-facture">—</td>
-              <td>—</td><td>—</td>
+              <td>—</td><td>—</td><td>—</td>
               <td id="tot-encaisse">—</td>
               <td id="tot-reste">—</td>
             </tr>
@@ -766,7 +768,8 @@ select:focus, input:focus { border-color: var(--bleu); box-shadow: 0 0 0 3px rgb
         <div style="padding:16px;font-size:12px;line-height:1.8;color:var(--gris-fonce)">
           📌 <strong>Régime micro — déclaration mensuelle</strong><br>
           📌 Tu déclares ce que tu <em>encaisses</em> chaque mois, avant le 15 du mois suivant.<br>
-          📌 <strong>Studeria</strong> paie à M+1 · <strong>Revolia</strong> paie à M+4<br>
+          📌 <strong>Studeria</strong> paie à M+1 · <strong>Revolia</strong> paie à M+4 · <strong>Excellis</strong> facturé début de mois<br>
+          📌 <strong>Studeria salarié dès le 01/10/2026</strong> : ne saisir « Studeria reçu » que pour les prestations micro (≤ septembre 2026, encaissées jusqu'en octobre)<br>
           📌 Saisir les montants reçus dans les cases vertes quand le virement arrive.<br>
           📌 Taux cotisations estimé : <strong>22%</strong> (BIC services micro)
         </div>
@@ -780,7 +783,7 @@ select:focus, input:focus { border-color: var(--bleu); box-shadow: 0 0 0 3px rgb
 <div class="page" id="page-recap">
   <div class="card">
     <div class="card-header">
-      <span class="card-title">📊 Récapitulatif Mensuel 2026</span>
+      <span class="card-title">📊 Récapitulatif Mensuel — micro-entreprise</span>
       <span style="font-size:11px;color:var(--gris-med)">Calculé automatiquement depuis tes sessions réalisées</span>
     </div>
     <div class="table-wrap">
@@ -790,7 +793,7 @@ select:focus, input:focus { border-color: var(--bleu); box-shadow: 0 0 0 3px rgb
             <th rowspan="2" style="vertical-align:middle">Mois</th>
             <th colspan="4" style="text-align:center;background:#1565C0">⏱ Heures BPF</th>
             <th rowspan="2" style="vertical-align:middle;background:#4A148C">H Hors BPF<br>Ambassadrice</th>
-            <th colspan="3" style="text-align:center;background:#1B5E20">💶 CA Brut</th>
+            <th colspan="4" style="text-align:center;background:#1B5E20">💶 CA Brut (micro)</th>
             <th rowspan="2" style="vertical-align:middle;background:#B71C1C">CA Net<br>(après charges)</th>
             <th colspan="3" style="text-align:center;background:#E65100">👥 Apprenants</th>
             <th rowspan="2" style="vertical-align:middle">Notes</th>
@@ -802,6 +805,7 @@ select:focus, input:focus { border-color: var(--bleu); box-shadow: 0 0 0 3px rgb
             <th style="background:#0D47A1;font-weight:700">TOTAL H BPF</th>
             <th style="background:#2E7D32">Formation</th>
             <th style="background:#2E7D32">Ambassadrice</th>
+            <th style="background:#2E7D32">Excellis</th>
             <th style="background:#1B5E20;font-weight:700">TOTAL CA</th>
             <th style="background:#BF360C">Nb Ind.</th>
             <th style="background:#BF360C">Nb Col.</th>
@@ -838,7 +842,13 @@ select:focus, input:focus { border-color: var(--bleu); box-shadow: 0 0 0 3px rgb
         <span style="font-size:11px;color:var(--gris-med)">Charges 27%</span>
         <button class="btn btn-sm" style="background:#7C4DFF;color:white;font-size:12px" onclick="openFactureModal('Studeria')">🧾 Facture Studeria</button>
         <button class="btn btn-sm" style="background:#C2185B;color:white;font-size:12px" onclick="openFactureModal('Revolia')">🧾 Facture Revolia</button>
+        <button class="btn btn-sm" style="background:#00838F;color:white;font-size:12px" onclick="generateFactureExcellis()">🧾 Facture Excellis</button>
       </div>
+    </div>
+    <div style="padding:10px 16px;font-size:12px;background:#E0F7FA;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <strong>Excellis (client direct)</strong> — forfait mensuel :
+      <input type="number" id="excellisMontant" min="0" step="10" style="width:90px" onchange="saveExcellisMontant(this.value)"> €
+      <span style="color:var(--gris-med)">facturé début de mois pour le mois en cours, dès octobre 2026 · activité indépendante (CA micro)</span>
     </div>
     <div class="table-wrap">
       <table id="factTable">
@@ -848,6 +858,7 @@ select:focus, input:focus { border-color: var(--bleu); box-shadow: 0 0 0 3px rgb
             <th style="background:#1565C0">CA Studeria<br>Formation</th>
             <th style="background:#1565C0">CA Revolia<br>Formation</th>
             <th style="background:#6A1B9A">CA Ambassadrice<br>Studeria</th>
+            <th style="background:#00838F">CA Excellis<br>Forfait</th>
             <th style="background:#0D47A1;font-weight:700">TOTAL<br>CA Brut</th>
             <th style="background:#B71C1C">Charges<br>27%</th>
             <th style="background:#1B5E20;font-weight:700">CA NET</th>
@@ -1220,6 +1231,26 @@ const GROUPES_COLLECTIFS = {
   'CON': 15,
   'ACC': 15,
 };
+// ── Bascule salariée Studeria (CDI au 01/10/2026) ──
+// Studeria salarié = hors CA micro-entreprise. Indépendant = Revolia, Excellis, clients directs.
+const DATE_CDI = '2026-10-01';
+const EXCELLIS_DEBUT = '2026-10';
+function isSalarie(s) { return s.of === 'Studeria' && s.date >= DATE_CDI; }
+function annee() { return parseInt(state.annee) || new Date().getFullYear(); }
+function sessionsAnnee() { return state.sessions.filter(s => s.date.startsWith(annee() + '-')); }
+function sessionsMicro() { return sessionsAnnee().filter(s => !isSalarie(s)); }
+// Clé de stockage compta : historique 2026 inchangé, autres années préfixées
+function ck(mois) { return annee() === 2026 ? mois : annee() + '_' + mois; }
+function moisKey(mois) { return annee() + '-' + String(MOIS_LISTE.indexOf(mois) + 1).padStart(2, '0'); }
+// Excellis : forfait mensuel facturé début de mois (compte dès le mois en cours)
+function caExcellis(mois) {
+  const key = moisKey(mois);
+  if (key < EXCELLIS_DEBUT || key > TODAY.slice(0, 7)) return 0;
+  const ex = state.excellis || {};
+  const v = ex.montants && ex.montants[key] !== undefined ? ex.montants[key] : ex.montant;
+  return parseFloat(v) || 0;
+}
+function caExcellisAnnee() { return MOIS_LISTE.reduce((a, m) => a + caExcellis(m), 0); }
 const MOIS_LISTE = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 
 // ════════════════════════════════════════
@@ -1230,7 +1261,9 @@ let state = {
   apprenants: {},
   compta: {},   // { 'Janvier': { studeria: 0, revolia: 0 }, ... }
   apiKey: '',
-  apprenantDetails: {}  // { 'EL': { date1: '...' }, ... } — corrections manuelles
+  apprenantDetails: {},  // { 'EL': { date1: '...' }, ... } — corrections manuelles
+  annee: null,           // année affichée (défaut : année courante)
+  excellis: { montant: 0, montants: {}, nom: 'EXCELLIS', adresse: '', siren: '' }  // forfait mensuel
 };
 
 function loadState() {
@@ -1313,6 +1346,7 @@ function tauxSession(s) {
 // Pour les sessions collectives Revolia : forfait 80€ PAR SESSION (pas à l'heure)
 function caSession(s) {
   if (s.statut === 'Annule') return 0;
+  if (isSalarie(s)) return 0; // salarié Studeria : hors CA micro
   if (s.nature === 'Formation Collective' && s.of === 'Revolia') return TAUX.revolia_collectif;
   return s.duree * tauxSession(s);
 }
@@ -1327,6 +1361,14 @@ function showNotif(msg, type='success') {
 // ════════════════════════════════════════
 // NAVIGATION
 // ════════════════════════════════════════
+function setAnnee(v) {
+  state.annee = parseInt(v);
+  saveState();
+  const cur = document.querySelector('.page.active');
+  if (cur) showPage(cur.id.replace('page-', ''));
+  renderStats();
+}
+
 function showPage(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -1347,11 +1389,12 @@ function showPage(page) {
 function renderStats() {
   const now = new Date();
   const curMois = MOIS_LISTE[now.getMonth()];
-  const sessionsThisMois = state.sessions.filter(s => s.mois === curMois && s.statut === 'Realise');
-  const heuresThisMois   = sessionsThisMois.reduce((a, s) => a + s.duree, 0);
-  const caThisMois       = sessionsThisMois.reduce((a, s) => a + caSession(s), 0);
+  const sessionsThisMois = sessionsAnnee().filter(s => s.mois === curMois && s.statut === 'Realise');
+  const heuresThisMois   = sessionsThisMois.filter(s => !isSalarie(s)).reduce((a, s) => a + s.duree, 0);
+  const caThisMois       = sessionsThisMois.reduce((a, s) => a + caSession(s), 0) + caExcellis(curMois);
+  const hSalarie         = sessionsAnnee().filter(s => isSalarie(s) && s.statut === 'Realise').reduce((a, s) => a + s.duree, 0);
   const sessionsFutures  = state.sessions.filter(s => s.date >= TODAY && s.statut === 'Prevu').length;
-  const caAnnuel         = state.sessions.filter(s => s.statut === 'Realise').reduce((a,s) => a + caSession(s), 0);
+  const caAnnuel         = sessionsAnnee().filter(s => s.statut === 'Realise').reduce((a,s) => a + caSession(s), 0) + caExcellisAnnee();
 
   document.getElementById('statsRow').innerHTML = `
     <div class="stat-card">
@@ -1370,10 +1413,15 @@ function renderStats() {
       <div class="stat-sub">prévues à partir d'aujourd'hui</div>
     </div>
     <div class="stat-card orange">
-      <div class="stat-label">CA annuel 2026</div>
+      <div class="stat-label">CA annuel ${annee()}</div>
       <div class="stat-val">${caAnnuel.toLocaleString('fr-FR')} €</div>
-      <div class="stat-sub">toutes sessions réalisées</div>
+      <div class="stat-sub">micro-entreprise (hors Studeria salarié)</div>
     </div>
+    ${hSalarie > 0 ? `<div class="stat-card">
+      <div class="stat-label">Studeria salarié</div>
+      <div class="stat-val">${hSalarie.toFixed(1)} h</div>
+      <div class="stat-sub">depuis le 01/10/2026 — hors CA micro</div>
+    </div>` : ''}
   `;
 }
 
@@ -1498,7 +1546,7 @@ function renderSessions() {
       <td style="text-align:center">${s.duree}h</td>
       <td><strong>${nom}</strong><br><span style="font-size:11px;color:var(--gris-med)">${s.id}</span></td>
       <td>${badgeNature(s.nature)}</td>
-      <td><span class="badge badge-${s.of.toLowerCase()}">${s.of}</span></td>
+      <td><span class="badge badge-${s.of.toLowerCase()}">${s.of}</span>${isSalarie(s) ? '<br><span class="badge" style="background:#FFF3E0;color:#E65100;margin-top:3px">💼 Salarié</span>' : ''}</td>
       <td style="max-width:200px;font-size:12px;color:var(--gris-fonce)">${s.sujet||'—'}</td>
       <td>${badgeStatut(s.statut)}</td>
       <td>
@@ -1744,12 +1792,13 @@ function renderCompta() {
   let totFact = 0, totEnc = 0;
 
   tbody.innerHTML = MOIS_LISTE.map(mois => {
-    const ss = state.sessions.filter(s => s.mois === mois && s.statut === 'Realise');
-    const facture = ss.reduce((a,s) => a + caSession(s), 0);
-    const key = mois;
+    const ss = sessionsMicro().filter(s => s.mois === mois && s.statut === 'Realise');
+    const facture = ss.reduce((a,s) => a + caSession(s), 0) + caExcellis(mois);
+    const key = ck(mois);
     const studEnc = state.compta[key]?.studeria || '';
     const revEnc  = state.compta[key]?.revolia  || '';
-    const encaisse = (parseFloat(studEnc)||0) + (parseFloat(revEnc)||0);
+    const excEnc  = state.compta[key]?.excellis || '';
+    const encaisse = (parseFloat(studEnc)||0) + (parseFloat(revEnc)||0) + (parseFloat(excEnc)||0);
     const reste = facture - encaisse;
     totFact += facture;
     totEnc  += encaisse;
@@ -1766,6 +1815,11 @@ function renderCompta() {
       <td style="text-align:center">
         <input type="number" class="encaisse-input" value="${revEnc}"
           onchange="saveCompta('${key}','revolia',this.value)"
+          placeholder="0" min="0">
+      </td>
+      <td style="text-align:center">
+        <input type="number" class="encaisse-input" value="${excEnc}"
+          onchange="saveCompta('${key}','excellis',this.value)"
           placeholder="0" min="0">
       </td>
       <td style="text-align:right;color:var(--vert);font-weight:600">${encaisse ? encaisse.toLocaleString('fr-FR')+'€' : '—'}</td>
@@ -1791,7 +1845,8 @@ function renderCompta() {
   ];
 
   document.getElementById('urssafBody').innerHTML = MOIS_LISTE.map((mois, i) => {
-    const total = (parseFloat(state.compta[mois]?.studeria)||0) + (parseFloat(state.compta[mois]?.revolia)||0);
+    const c = state.compta[ck(mois)] || {};
+    const total = (parseFloat(c.studeria)||0) + (parseFloat(c.revolia)||0) + (parseFloat(c.excellis)||0);
     const cotis = total * TAUX.charges;
     const isCurrent = i === moisActuel;
     const isPast    = i < moisActuel;
@@ -2010,7 +2065,7 @@ function buildContext() {
 
   // Calculs synthèse
   const sessionsRealisees = state.sessions.filter(s => s.statut === 'Realise');
-  const caTotal  = sessionsRealisees.reduce((a, s) => a + caSession(s), 0);
+  const caTotal  = sessionsRealisees.reduce((a, s) => a + caSession(s), 0) + caExcellisAnnee();
   const hTotal   = sessionsRealisees.reduce((a, s) => a + s.duree, 0);
   const caMois   = sessionsRealisees.filter(s => s.mois === curMois).reduce((a, s) => a + caSession(s), 0);
   const hMois    = sessionsRealisees.filter(s => s.mois === curMois).reduce((a, s) => a + s.duree, 0);
@@ -2028,11 +2083,14 @@ function buildContext() {
     statut: s.statut,
     sujet: s.sujet,
     ca: caSession(s),
+    regime: isSalarie(s) ? 'salarie' : 'independant',
     taux: tauxSession(s)
   }));
 
   return `Tu es l'assistant CRM de Catherine Le Pennec, formatrice IA indépendante (Pas à Pas IA).
 Aujourd'hui : ${fmtDate(TODAY)} — ${curMois} ${now.getFullYear()}
+
+RÉGIMES : depuis le 01/10/2026 Catherine est salariée (CDI) chez Studeria — ces sessions (regime 'salarie') ne comptent PAS dans le CA micro-entreprise (ca = 0). Activité indépendante (CA micro) : Revolia, Excellis (forfait mensuel ${(state.excellis||{}).montant||0} EUR facturé début de mois depuis octobre 2026, CA Excellis ${annee()} = ${caExcellisAnnee()} EUR), clients directs.
 
 SYNTHÈSE :
 - CA annuel réalisé : ${caTotal.toFixed(2)} EUR (${hTotal}h)
@@ -2152,11 +2210,13 @@ function initFilters() {
 // FACTURATION
 // ════════════════════════════════════════
 function renderFacturation() {
+  const inpExc = document.getElementById('excellisMontant');
+  if (inpExc) inpExc.value = (state.excellis && state.excellis.montant) || '';
   const TAUX_CHARGES = 0.27;
 
   // Calculer CA par mois
   const rows = MOIS_LISTE.map(mois => {
-    const ss = state.sessions.filter(s => s.mois === mois && s.statut === 'Realise');
+    const ss = sessionsMicro().filter(s => s.mois === mois && s.statut === 'Realise');
 
     const caStudForm = ss.filter(s => s.of === 'Studeria' && s.nature !== 'Ambassadrice')
                          .reduce((a,s) => a + caSession(s), 0);
@@ -2164,17 +2224,18 @@ function renderFacturation() {
                          .reduce((a,s) => a + caSession(s), 0);
     const caAmb      = ss.filter(s => s.nature === 'Ambassadrice')
                          .reduce((a,s) => a + caSession(s), 0);
-    const caBrut     = caStudForm + caRevolia + caAmb;
+    const caExc      = caExcellis(mois);
+    const caBrut     = caStudForm + caRevolia + caAmb + caExc;
     const charges    = caBrut * TAUX_CHARGES;
     const caNet      = caBrut - charges;
 
     // Notes et n° factures sauvegardés localement
-    const noteKey    = 'fact_' + mois;
+    const noteKey    = 'fact_' + ck(mois);
     const factStud   = state.compta[noteKey + '_stud']  || '';
     const factRev    = state.compta[noteKey + '_rev']   || '';
     const notes      = state.compta[noteKey + '_notes'] || '';
 
-    return { mois, caStudForm, caRevolia, caAmb, caBrut, charges, caNet,
+    return { mois, caStudForm, caRevolia, caAmb, caExc, caBrut, charges, caNet,
              factStud, factRev, notes, hasData: caBrut > 0 };
   });
 
@@ -2195,6 +2256,7 @@ function renderFacturation() {
       <td>${fmtE(r.caStudForm)}</td>
       <td>${fmtE(r.caRevolia)}</td>
       <td>${fmtE(r.caAmb)}</td>
+      <td>${fmtE(r.caExc)}</td>
       <td class="col-brut">${fmtE(r.caBrut, true)}</td>
       <td class="col-charge">${fmtE(r.charges)}</td>
       <td class="col-net">${fmtE(r.caNet, true)}</td>
@@ -2226,11 +2288,12 @@ function renderFacturation() {
   const totStud  = rows.reduce((a,r) => a + r.caStudForm, 0);
   const totRev   = rows.reduce((a,r) => a + r.caRevolia, 0);
   const totAmb   = rows.reduce((a,r) => a + r.caAmb, 0);
+  const totExc   = rows.reduce((a,r) => a + r.caExc, 0);
 
   const fmtT = v => v ? v.toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €' : '—';
   document.getElementById('factFoot').innerHTML = `<tr>
-    <td>TOTAL 2026</td>
-    <td>${fmtT(totStud)}</td><td>${fmtT(totRev)}</td><td>${fmtT(totAmb)}</td>
+    <td>TOTAL ${annee()}</td>
+    <td>${fmtT(totStud)}</td><td>${fmtT(totRev)}</td><td>${fmtT(totAmb)}</td><td>${fmtT(totExc)}</td>
     <td>${fmtT(totBrut)}</td><td>${fmtT(totCharg)}</td><td>${fmtT(totNet)}</td>
     <td colspan="2" style="text-align:center;font-size:11px;opacity:.7">Cumul annuel ↑</td>
     <td colspan="3"></td>
@@ -2240,8 +2303,77 @@ function renderFacturation() {
   renderCumulChart(rows);
 }
 
+function saveExcellisMontant(val) {
+  if (!state.excellis) state.excellis = { montant: 0, montants: {} };
+  state.excellis.montant = parseFloat(val) || 0;
+  saveState();
+  renderFacturation(); renderStats();
+  showNotif('Forfait Excellis enregistré ✓');
+}
+
+// Facture Excellis : forfait mensuel, émise début de mois pour le mois en cours
+function generateFactureExcellis() {
+  const ex = state.excellis || {};
+  const montant = parseFloat(ex.montant) || 0;
+  if (!montant) { showNotif("❌ Renseigne d'abord le forfait mensuel Excellis", 'error'); return; }
+  const choix = prompt('Mois à facturer (1-12) :', String(new Date().getMonth() + 1));
+  if (!choix) return;
+  const idx = parseInt(choix) - 1;
+  if (isNaN(idx) || idx < 0 || idx > 11) { showNotif('❌ Mois invalide', 'error'); return; }
+  const year = annee();
+  const key = year + '-' + String(idx + 1).padStart(2, '0');
+  if (key < EXCELLIS_DEBUT) { showNotif('❌ Excellis démarre en octobre 2026', 'error'); return; }
+  const mois = MOIS_LISTE[idx];
+  const total = (ex.montants && ex.montants[key] !== undefined) ? parseFloat(ex.montants[key]) : montant;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const noteKey = 'fact_' + ck(mois) + '_exc';
+  const factId = state.compta[noteKey] || ('EXC-' + year + '-' + String(idx + 1).padStart(2, '0'));
+  const dateEmission = new Date(year, idx, 1).toLocaleDateString('fr-FR');
+  const dateEcheance = new Date(year, idx, 15).toLocaleDateString('fr-FR');
+  const iban = state.compta.iban || 'FR76 1460 7000 5470 9194 5927 301';
+  const bic  = state.compta.bic  || 'CCBPFRPPMAR';
+  doc.setFillColor(20, 20, 20); doc.rect(0, 0, 210, 32, 'F');
+  doc.setTextColor(0, 188, 212); doc.setFontSize(22); doc.setFont('helvetica', 'bold'); doc.text('PAS À PAS IA', 14, 14);
+  doc.setTextColor(255, 255, 255); doc.setFontSize(8.5); doc.setFont('helvetica', 'normal');
+  doc.text('Catherine Le Pennec · Formatrice IA', 14, 21);
+  doc.setTextColor(124, 77, 255); doc.setFontSize(26); doc.setFont('helvetica', 'bold'); doc.text('FACTURE', 196, 20, { align: 'right' });
+  let y = 46;
+  doc.setTextColor(20, 20, 20); doc.setFontSize(10); doc.text('Catherine Le Pennec', 14, y);
+  doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60);
+  ['Route de la mer — 20213 Penta di Casinca', 'Tél : 07 87 30 28 40', 'SIRET : 853 489 722 00043', 'N° déclaration activité : 94202147520']
+    .forEach((l, i) => doc.text(l, 14, y + 6 + i * 5));
+  doc.setTextColor(20, 20, 20); doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.text(ex.nom || 'EXCELLIS', 115, y);
+  doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60);
+  if (ex.adresse) doc.text(ex.adresse, 115, y + 6);
+  if (ex.siren) doc.text('SIREN : ' + ex.siren, 115, y + 11);
+  y += 34;
+  doc.setTextColor(20, 20, 20); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.text('N° ' + factId, 14, y); doc.text('Émise le ' + dateEmission + ' · Échéance ' + dateEcheance, 196, y, { align: 'right' });
+  y += 8;
+  doc.autoTable({ startY: y, head: [['Désignation', 'Période', 'Montant']],
+    body: [['Prestation de formation IA — forfait mensuel', mois + ' ' + year, fmtEuro(total)]],
+    headStyles: { fillColor: [20, 20, 20] }, columnStyles: { 2: { halign: 'right' } }, margin: { left: 14, right: 14 } });
+  y = doc.lastAutoTable.finalY + 8;
+  doc.setFillColor(20, 20, 20); doc.rect(14, y, 182, 14, 'F');
+  doc.setTextColor(180, 180, 180); doc.setFontSize(9); doc.text('TOTAL NET A PAYER', 18, y + 9);
+  doc.setTextColor(0, 188, 212); doc.setFontSize(14); doc.text(fmtEuro(total), 192, y + 9.5, { align: 'right' });
+  y += 18;
+  doc.setTextColor(130, 130, 130); doc.setFontSize(7); doc.setFont('helvetica', 'italic');
+  doc.text('Règlement par virement bancaire · Exonéré de TVA — art. 261-4-4°a du CGI', 14, y);
+  const pH = doc.internal.pageSize.height;
+  doc.setFillColor(20, 20, 20); doc.rect(0, pH - 22, 210, 22, 'F');
+  doc.setTextColor(0, 188, 212); doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.text('Coordonnées bancaires', 14, pH - 15);
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'normal'); doc.text('IBAN : ' + iban + '   BIC : ' + bic, 14, pH - 10);
+  state.compta[noteKey] = factId;
+  saveState();
+  renderFacturation();
+  doc.save('Facture_' + factId + '.pdf');
+  showNotif('✅ Facture ' + factId + ' générée (' + fmtEuro(total) + ')');
+}
+
 function saveFactNote(mois, type, val) {
-  const key = 'fact_' + mois + '_' + type;
+  const key = 'fact_' + ck(mois) + '_' + type;
   if (!state.compta) state.compta = {};
   state.compta[key] = val;
   saveState();
@@ -2281,7 +2413,7 @@ function renderCumulChart(rows) {
 // BLOC BPF
 // ════════════════════════════════════════
 function renderBPF() {
-  const ss = state.sessions.filter(s => s.statut === 'Realise');
+  const ss = sessionsMicro().filter(s => s.statut === 'Realise'); // hors Studeria salarié
 
   // Apprenants individuels uniques (hors AMB/CON/DAI)
   const appIndividuels = new Set(
@@ -2405,7 +2537,8 @@ function renderRecap() {
 
   // Calculer pour chaque mois
   const rows = MOIS_LISTE.map(mois => {
-    const ss = state.sessions.filter(s => s.mois === mois && s.statut === 'Realise');
+    const ss = sessionsMicro().filter(s => s.mois === mois && s.statut === 'Realise');
+    const hSal = sessionsAnnee().filter(s => isSalarie(s) && s.mois === mois && s.statut === 'Realise').reduce((a,s) => a + s.duree, 0);
 
     // Heures BPF
     const hStudInd = ss.filter(s => s.of==='Studeria' && s.nature==='Formation Individuelle')
@@ -2422,7 +2555,8 @@ function renderRecap() {
     // CA Brut
     const caForm = ss.filter(s => s.nature !== 'Ambassadrice').reduce((a,s) => a + caSession(s), 0);
     const caAmb  = ss.filter(s => s.nature === 'Ambassadrice').reduce((a,s) => a + caSession(s), 0);
-    const caTotal = caForm + caAmb;
+    const caExc   = caExcellis(mois);
+    const caTotal = caForm + caAmb + caExc;
     const caNet   = caTotal * (1 - TAUX_CHARGES);
 
     // Apprenants
@@ -2434,8 +2568,8 @@ function renderRecap() {
                      .reduce((a,s) => a + (s.nb_app || 0), 0);
     const seancesCol = ss.filter(s => s.nature==='Formation Collective').length;
 
-    return { mois, hStudInd, hStudCol, hRevolia, hBPF, hAmb, caForm, caAmb, caTotal, caNet,
-             appInd, appCol, seancesCol, hasData: caTotal > 0 || hBPF > 0 };
+    return { mois, hStudInd, hStudCol, hRevolia, hBPF, hAmb, caForm, caAmb, caExc, hSal, caTotal, caNet,
+             appInd, appCol, seancesCol, hasData: caTotal > 0 || hBPF > 0 || hSal > 0 };
   });
 
   const fmt  = v => v > 0 ? v.toLocaleString('fr-FR', {maximumFractionDigits:1}) : '<span style="color:#ccc">—</span>';
@@ -2452,12 +2586,13 @@ function renderRecap() {
       <td>${fmt(r.hAmb)}</td>
       <td>${fmtE(r.caForm)}</td>
       <td>${fmtE(r.caAmb)}</td>
+      <td>${fmtE(r.caExc)}</td>
       <td class="col-total">${fmtE(r.caTotal)}</td>
       <td style="color:var(--rose)">${fmtE(r.caNet)}</td>
       <td>${r.appInd || '<span style="color:#ccc">—</span>'}</td>
       <td>${r.appCol || '<span style="color:#ccc">—</span>'}</td>
       <td class="col-total">${r.seancesCol || '<span style="color:#ccc">—</span>'}</td>
-      <td></td>
+      <td style="font-size:11px;color:#E65100">${r.hSal ? '💼 Salarié Studeria : ' + r.hSal + ' h (hors micro)' : ''}</td>
     </tr>`;
   }).join('');
 
@@ -2466,20 +2601,20 @@ function renderRecap() {
     hStudInd: acc.hStudInd + r.hStudInd, hStudCol: acc.hStudCol + r.hStudCol,
     hRevolia: acc.hRevolia + r.hRevolia, hBPF: acc.hBPF + r.hBPF,
     hAmb: acc.hAmb + r.hAmb, caForm: acc.caForm + r.caForm,
-    caAmb: acc.caAmb + r.caAmb, caTotal: acc.caTotal + r.caTotal,
+    caAmb: acc.caAmb + r.caAmb, caExc: acc.caExc + r.caExc, caTotal: acc.caTotal + r.caTotal,
     caNet: acc.caNet + r.caNet, appInd: acc.appInd + r.appInd,
     appCol: acc.appCol + r.appCol, seancesCol: acc.seancesCol + r.seancesCol,
-  }), { hStudInd:0, hStudCol:0, hRevolia:0, hBPF:0, hAmb:0, caForm:0, caAmb:0, caTotal:0, caNet:0, appInd:0, appCol:0, seancesCol:0 });
+  }), { hStudInd:0, hStudCol:0, hRevolia:0, hBPF:0, hAmb:0, caForm:0, caAmb:0, caExc:0, caTotal:0, caNet:0, appInd:0, appCol:0, seancesCol:0 });
 
   const fmtT  = v => v > 0 ? v.toLocaleString('fr-FR', {maximumFractionDigits:1}) : '—';
   const fmtTE = v => v > 0 ? v.toLocaleString('fr-FR', {maximumFractionDigits:0}) + '€' : '—';
 
   document.getElementById('recapFoot').innerHTML = `<tr>
-    <td>TOTAL 2026</td>
+    <td>TOTAL ${annee()}</td>
     <td>${fmtT(tot.hStudInd)}</td><td>${fmtT(tot.hStudCol)}</td>
     <td>${fmtT(tot.hRevolia)}</td><td>${fmtT(tot.hBPF)}</td>
     <td>${fmtT(tot.hAmb)}</td>
-    <td>${fmtTE(tot.caForm)}</td><td>${fmtTE(tot.caAmb)}</td>
+    <td>${fmtTE(tot.caForm)}</td><td>${fmtTE(tot.caAmb)}</td><td>${fmtTE(tot.caExc)}</td>
     <td>${fmtTE(tot.caTotal)}</td><td>${fmtTE(tot.caNet)}</td>
     <td>${tot.appInd||'—'}</td><td>${tot.appCol||'—'}</td>
     <td>${tot.seancesCol||'—'}</td><td></td>
@@ -2646,7 +2781,7 @@ function openFactureModal(ofName) {
   const sel = document.getElementById('factureMois');
   sel.innerHTML = MOIS_LISTE.map(m => {
     const ca = state.sessions
-      .filter(s => s.mois === m && s.statut === 'Realise' && s.of === ofName
+      .filter(s => s.mois === m && s.statut === 'Realise' && !isSalarie(s) && s.of === ofName
                && (ofName !== 'Revolia' || s.nature === 'Formation Collective'))
       .reduce((a, s) => a + caSession(s), 0);
     const flag = ca > 0 ? ` — ${ca.toLocaleString('fr-FR')} €` : ' (aucune session)';
@@ -2735,7 +2870,7 @@ function updateFacturePreview() {
 
   const moisStr = document.getElementById('factureMois').value;
   const sessions = state.sessions.filter(s =>
-    s.mois === moisStr && s.statut === 'Realise' && s.of === _factureOf
+    s.mois === moisStr && s.statut === 'Realise' && !isSalarie(s) && s.of === _factureOf
     && (_factureOf !== 'Revolia' || s.nature === 'Formation Collective')
   );
   const nbInd = sessions.filter(s => s.nature === 'Formation Individuelle').length;
@@ -2776,7 +2911,7 @@ function goToFactureStep2() {
     const moisStr = document.getElementById('factureMois').value;
     const filtre  = _factureOf === 'Revolia'
       ? (s => s.mois === moisStr && s.statut === 'Realise' && s.of === 'Revolia' && s.nature === 'Formation Collective')
-      : (s => s.mois === moisStr && s.statut === 'Realise' && s.of === _factureOf);
+      : (s => s.mois === moisStr && s.statut === 'Realise' && !isSalarie(s) && s.of === _factureOf);
     sessions = state.sessions.filter(filtre);
     if (sessions.length === 0) { showNotif(`❌ Aucune session ${_factureOf} en ${moisStr}`, 'error'); return; }
     const moisIdx = MOIS_LISTE.indexOf(moisStr);
@@ -2836,7 +2971,7 @@ function lancerFacture() {
   const moisStr = document.getElementById('factureMois').value;
   const filtre  = _factureOf === 'Revolia'
     ? (s => s.mois === moisStr && s.statut === 'Realise' && s.of === 'Revolia' && s.nature === 'Formation Collective')
-    : (s => s.mois === moisStr && s.statut === 'Realise' && s.of === _factureOf);
+    : (s => s.mois === moisStr && s.statut === 'Realise' && !isSalarie(s) && s.of === _factureOf);
   if (!state.sessions.some(filtre)) {
     showNotif(`❌ Aucune session ${_factureOf} en ${moisStr}`, 'error');
     return;
@@ -2871,7 +3006,7 @@ function generateFacturePDF(ofName, moisStr, overrides = {}) {
     moisIdx  = MOIS_LISTE.indexOf(moisStr);
     const filtre = ofName === 'Revolia'
       ? (s => s.mois === moisStr && s.statut === 'Realise' && s.of === 'Revolia' && s.nature === 'Formation Collective')
-      : (s => s.mois === moisStr && s.statut === 'Realise' && s.of === ofName);
+      : (s => s.mois === moisStr && s.statut === 'Realise' && !isSalarie(s) && s.of === ofName);
     sessions = state.sessions.filter(filtre);
   }
 
@@ -3316,6 +3451,8 @@ function init() {
     saveState();
   }
 
+  const sel = document.getElementById('anneeSelect');
+  if (sel) sel.value = String(annee());
   buildDatalist();
   initFilters();
   renderStats();
