@@ -2817,6 +2817,7 @@ function setRevoliaType(type) {
     const prets = Object.keys(APPRENANTS_FULL).filter(id => {
       const a = APPRENANTS_FULL[id];
       if (a.of !== 'Revolia' || a.type !== 'Individuel') return false;
+      if (state.apprenantDetails[id]?.revoliaFacture) return false; // déjà facturé
       const hC = state.apprenantDetails[id]?.h_contrat ?? null;
       if (hC === null) return false;
       const hFait = (a.h_av26 || 0) + (state.sessions.filter(s => s.id === id && s.statut === 'Realise').reduce((a,s) => a + s.duree, 0));
@@ -2825,6 +2826,7 @@ function setRevoliaType(type) {
     // Aussi les apprenants manuels Revolia
     Object.keys(state.apprenants).forEach(id => {
       if (APPRENANTS_FULL[id]) return;
+      if (state.apprenantDetails[id]?.revoliaFacture) return;
       const hC = state.apprenantDetails[id]?.h_contrat ?? null;
       if (!hC) return;
       const hFait = state.sessions.filter(s => s.id === id && s.statut === 'Realise').reduce((a,s) => a + s.duree, 0);
